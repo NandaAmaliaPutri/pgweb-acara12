@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Leaflet CSS link -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+    <title>Web-GIS with GeoServer and Leaflet</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* Legenda Styling */
+        #legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            max-height: 150px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            overflow: hidden;
+        }
+
+        #legend h4 {
+            margin: 0;
+            font-size: 14px;
+            text-align: center;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ccc;
+            background-color: #f1f1f1;
+            position: sticky;
+            top: 0;
+        }
+
+        /* Kontrol Layer Styling */
+        #layer-control-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 10px 15px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            width: 250px;
+            max-height: 300px;
+            overflow-y: auto;
+            transition: all 0.3s ease-in-out;
+        }
+
+        #layer-control-container:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #layer-control-container h4 {
+            margin: 0;
+            font-size: 16px;
+            text-align: center;
+            padding: 5px 0;
+            background-color: #f7f7f7;
+            border-bottom: 2px solid #ccc;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .leaflet-control-layers {
+            font-size: 13px;
+        }
+
+        /* Layer control checkbox styling */
+        .leaflet-control-layers label {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .leaflet-control-layers label input {
+            margin-right: 10px;
+        }
+
+        .leaflet-control-layers label input:checked {
+            border-color: #4CAF50;
+            background-color: #4CAF50;
+        }
+
+        /* Styling for layer groups */
+        .leaflet-control-layers-base label,
+        .leaflet-control-layers-overlays label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .leaflet-control-layers-base {
+            color: #0078AA;
+        }
+
+        .leaflet-control-layers-overlays {
+            color: #FF5733;
+        }
+
+        /* Customization for selected layer */
+        .leaflet-control-layers label input:focus {
+            outline: none;
+            box-shadow: 0 0 5px #4CAF50;
+        }
+
+        .leaflet-control-layers-overlays {
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            padding: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <!-- Legenda -->
+    <div id="legend">
+        <h4>Legenda</h4>
+        <div style="overflow-y: auto; max-height: 100px;">
+            <img src="http://localhost:8080/geoserver/acara12/wms?REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=acara12:ADMINISTRASIDESA_AR_25K" alt="Legenda Batas Administrasi Desa" />
+        </div>
+    </div>
+
+    <!-- Kontrol Layer -->
+    <div id="layer-control-container">
+        <h4>Layer Control</h4>
+        <div id="layer-control-content"></div>
+    </div>
+
+    <!-- Leaflet JS link -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <!-- Leaflet GeoServer request library -->
+    <script src="lib/L.Geoserver.js"></script>
+
+    <script>
+        // Inisialisasi peta
+        var map = L.map("map").setView([-7.680559783950118, 110.39074107194598], 10);
+
+        // Base map: OpenStreetMap
+        var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
+
+        // Overlay layer: WMS (Batas Administrasi Desa)
+        var batasAdministrasi = L.tileLayer.wms("http://localhost:8080/geoserver/acara12/wms", {
+            layers:"acara12:ADMINISTRASIDESA_AR_25K",
+            format: "image/png",
+            transparent: true,
+            attribution: "GeoServer WMS Layer",
+        }).addTo(map);
+
+        // Overlay layer: WMS (Jalan dari GeoPortal Sleman)
+        var jalan = L.tileLayer.wms("https://geoportal.slemankab.go.id/geoserver/wms", {
+            layers: "geonode:jalan_kabupaten_sleman_2023",
+            format: "image/png",
+            transparent: true,
+            attribution: "GeoPortal Sleman WMS Layer - Jalan"
+        });
+
+
+        // Kontrol layer
+        var baseMaps = {
+            "OpenStreetMap": osm,
+        };
+
+        var overlayMaps = {
+            "Batas Administrasi Desa": batasAdministrasi,
+            "Jalan": jalan // Menambahkan layer jalan ke kontrol
+        };
+
+        // Tambahkan kontrol layer ke container khusus
+        var layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false });
+        layerControl.addTo(map);
+
+        // Pindahkan kontrol layer ke elemen div khusus
+        document.getElementById("layer-control-content").appendChild(layerControl.getContainer());
+    </script>
+</body>
+
+</html>
